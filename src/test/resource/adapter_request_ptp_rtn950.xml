@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MTOSI_Envelope xmlns="tmf854.v1">
+	<MTOSI_Header>
+		<domain>Inventory</domain>
+		<activityName>getInventory</activityName>
+		<msgName>getInventory</msgName>
+		<msgType>REQUEST</msgType>
+		<payloadVersion>1.0</payloadVersion>
+		<correlationId>JOB-equipment_discovery-20</correlationId>
+		<msgSpecificProperties>
+			<property>
+				<propName>FileName</propName>
+				<propValue>./src/test/resources/RTN/RTN950/3145740_RTN950.xml</propValue>
+			</property>
+		</msgSpecificProperties>
+		<communicationPattern>SimpleResponse</communicationPattern>
+		<communicationStyle>MSG</communicationStyle>
+		<timestamp>1226686665786</timestamp>
+	</MTOSI_Header>
+	<MTOSI_Body>
+		<getInventory>
+			<filter>
+				<baseInstance>
+					<meNm>MyDomain^MySite^MyManagedElement1</meNm>
+					<aidNm>MyLabSystem</aidNm>
+				</baseInstance>
+				<includedObjectType>
+					<objectType>PTP</objectType>
+					<granularity>FULL</granularity>
+				</includedObjectType>
+			</filter>
+		</getInventory>
+	</MTOSI_Body>
+</MTOSI_Envelope>
