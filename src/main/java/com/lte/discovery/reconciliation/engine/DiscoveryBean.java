@@ -1,99 +1,111 @@
 package com.lte.discovery.reconciliation.engine;
 
 import javax.annotation.Resource;
-import javax.ejb.ActivationConfigProperty;
 import javax.ejb.MessageDriven;
-import javax.jms.DeliveryMode;
+import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
+import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
+import javax.jms.Queue;
+import javax.jms.Session;
 import javax.jms.TextMessage;
-import javax.jms.Topic;
-import javax.jms.TopicConnection;
-import javax.jms.TopicConnectionFactory;
-import javax.jms.TopicPublisher;
-import javax.jms.TopicSession;
-import javax.resource.spi.Activation;
 
 import com.lte.discovery.reconciliation.engine.dto.RequestDetails;
 
-@MessageDriven(name = "DiscoveryBean", activationConfig = { @ActivationConfigProperty(propertyName = "destinationType", propertyValue = "javax.jms.Topic"),
-	@ActivationConfigProperty(propertyName="subscriptionDurability",propertyValue="Durable")
-	/*@ActivationConfigProperty(propertyName="destinationJndiName",propertyValue="DiscoveryBeanJndi")*/})
+@MessageDriven()
 public class DiscoveryBean implements MessageListener {
 
-    @Resource
-    private TopicConnectionFactory topicConnectionFactory;
+	@Resource
+	private ConnectionFactory connectionFactory;
 
-    @Resource(name = "AdapterRequestTopic")
-    private Topic requestTopic;
+	@Resource(name = "AdapterBean")
+	private Queue adapterRequestQueue;
 
-    @Resource(name = "ResponseTopic")
-    private Topic responseTopic;
+	@Resource(name = "ResponseQueue")
+	private Queue responseQueue;
 
-    @Override
-    public void onMessage(Message message) {
-	System.out.println("DiscoveryBean.onMessage()");
+	@Override
+	public void onMessage(Message message) {
+		System.out.println("DiscoveryBean.onMessage()");
 
-	if (message instanceof ObjectMessage) {
-	    final ObjectMessage objectMessage = (ObjectMessage) message;
+		if (message instanceof ObjectMessage) {
+			System.out.println("message is instanceof ObjectMessage.");
 
-	    try {
-		RequestDetails requestDetails = (RequestDetails) objectMessage
-			.getObject();
-		System.out.println(requestDetails.toString());
+			ObjectMessage objectMessage = (ObjectMessage) message;
+			RequestDetails requestDetails = null;
+			try {
+				requestDetails = (RequestDetails) objectMessage.getObject();
+			} catch (JMSException e) {
+				System.err.println(e.getMessage());
+			}
 
-		sendToAdapter(RequestManager.create(requestDetails));
+			String adapterRequest = RequestManager.marshal(requestDetails);
 
-	    } catch (JMSException e) {
-		System.err.println(e.getMessage());
-	    }
-	} else if (message instanceof TextMessage) {
-	    final TextMessage textMessage = (TextMessage) message;
+			sendAdapterRequest(adapterRequest);
 
-	} else {
-	    System.err.println("Message type " + message.getClass().getName()
-		    + " is not handled.");
+		} else if (message instanceof TextMessage) {
+			System.out.println("message is instanceof TextMessage.");
+
+			TextMessage textMessage = (TextMessage) message;
+
+			String adapterResponse = null;
+			try {
+				adapterResponse = textMessage.getText();
+				System.out.println("******** textMessage.getText(): "
+						+ adapterResponse);
+			} catch (JMSException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+
+			sendAdapterResponse(adapterResponse);
+
+		} else {
+			System.err.println("message is not handled.");
+		}
+
 	}
 
-    }
+	private void sendAdapterResponse(String adapterResponse) {
+		Connection connection = null;
+		Session session = null;
 
-    private void sendToAdapter(String requestString) {
+		try {
+			connection = connectionFactory.createConnection();
+			connection.start();
 
-	TopicConnection connection = null;
-	TopicSession session = null;
+			session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
-	try {
-	    connection = topicConnectionFactory.createTopicConnection();
-	    connection.start();
+			final MessageProducer messageProducer = session
+					.createProducer(responseQueue);
+			messageProducer.send(session.createTextMessage(adapterResponse));
 
-	    session = connection.createTopicSession(false,
-		    TopicSession.AUTO_ACKNOWLEDGE);
+		} catch (JMSException e) {
+			System.err.println(e.getMessage());
+		}
 
-	    TopicPublisher topicPublisher = session
-		    .createPublisher(requestTopic);
-	    topicPublisher.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
-
-	    TextMessage message = session.createTextMessage(requestString);
-
-	    topicPublisher.publish(message);
-	} catch (JMSException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	} finally {
-
-	    try {
-		if (session != null)
-		    session.close();
-		if (connection != null)
-		    connection.close();
-	    } catch (JMSException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	    }
 	}
 
-    }
+	private void sendAdapterRequest(String adapterRequest) {
+		Connection connection = null;
+		Session session = null;
 
+		try {
+			connection = connectionFactory.createConnection();
+			connection.start();
+
+			session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+			final MessageProducer messageProducer = session
+					.createProducer(adapterRequestQueue);
+			messageProducer.send(session.createTextMessage(adapterRequest));
+
+		} catch (JMSException e) {
+			System.err.println(e.getMessage());
+		}
+
+	}
 }
